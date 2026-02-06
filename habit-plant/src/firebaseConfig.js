@@ -18,3 +18,10 @@ const analytics = getAnalytics(app);
 
 // 2. Initialize Firestore and EXPORT it so App.js can see it
 export const db = getFirestore(app);
+
+import { getAuth, GoogleAuthProvider } from "firebase/auth"; // Add this
+
+// ... existing code ...
+
+export const auth = getAuth(app); // Add this
+export const googleProvider = new GoogleAuthProvider(); // Add this

@@ -1,25 +1,46 @@
-import { db } from './firebaseConfig';
+import React, { useState } from 'react';
+import { db, auth, googleProvider } from './firebaseConfig';
+import { signInWithPopup, signOut } from "firebase/auth";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 
 function App() {
+  const [user, setUser] = useState(null);
+
+  const login = async () => {
+    const result = await signInWithPopup(auth, googleProvider);
+    setUser(result.user);
+  };
+
   const addHabit = async () => {
+    if (!user) return alert("Log in first!");
+    
     try {
-      await addDoc(collection(db, "users", "USER_ID_HERE", "habits"), {
-        name: "Morning Yoga",
-        plantType: "Fern",
+      // Notice we use user.uid to make it YOUR account!
+      await addDoc(collection(db, "users", user.uid, "habits"), {
+        name: "Drink 2L Water",
+        plantType: "Sunflower",
         growthLevel: 1,
         createdAt: serverTimestamp()
       });
-      alert("Habit Planted!");
+      alert("Habit added to your account!");
     } catch (e) {
-      console.error("Error adding document: ", e);
+      console.error(e);
     }
   };
 
   return (
-    <div className="App">
-      <h1>My Habit Garden</h1>
-      <button onClick={addHabit}>Plant a New Habit</button>
+    <div style={{ textAlign: 'center', marginTop: '50px' }}>
+      <h1>Habit Garden</h1>
+      
+      {!user ? (
+        <button onClick={login}>Login with Google</button>
+      ) : (
+        <div>
+          <p>Welcome, {user.displayName}!</p>
+          <button onClick={addHabit}>Plant New Habit</button>
+          <button onClick={() => signOut(auth).then(() => setUser(null))}>Logout</button>
+        </div>
+      )}
     </div>
   );
 }
