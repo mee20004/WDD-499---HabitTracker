@@ -2,6 +2,7 @@
   "expo": {
     "name": "HabitGardenMobile",
     "slug": "HabitGardenMobile",
+    "owner": "kameronmeeker",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -9,9 +10,11 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.kameronmeeker.HabitGardenMobile"
     },
     "android": {
+      "package": "com.kameronmeeker.HabitGardenMobile",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

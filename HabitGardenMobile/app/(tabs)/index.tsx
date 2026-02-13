@@ -17,9 +17,10 @@ import {
 import { db, auth } from '../../firebaseConfig';
 import { 
   collection, addDoc, serverTimestamp, query, 
-  onSnapshot, orderBy, doc, deleteDoc 
+  onSnapshot, orderBy 
 } from "firebase/firestore";
 
+// This allows the browser to close and return to the app after login
 WebBrowser.maybeCompleteAuthSession();
 
 export default function HomeScreen() {
@@ -28,11 +29,14 @@ export default function HomeScreen() {
   const [habitName, setHabitName] = useState("");
   const [loading, setLoading] = useState(true);
 
-  // 1. Configure the Google Auth Request
+// 1. Configure the Google Auth Request for a NATIVE BUILD
   const [request, response, promptAsync] = Google.useAuthRequest({
+    // Keep your Web Client ID for Firebase verification
     webClientId: '1043088781890-l5c3ltnel8focg814gsjquthkrou0221.apps.googleusercontent.com',
-    iosClientId: '1043088781890-8ghfebnkm1hrdmrq7r0csgvadf2vg3bk.apps.googleusercontent.com',
-    // THIS LINE IS THE FIX: It tells Google to use the Expo Proxy
+    iosClientId: 'YOUR_NEW_IOS_CLIENT_ID.apps.googleusercontent.com',
+    androidClientId: 'YOUR_NEW_ANDROID_CLIENT_ID.apps.googleusercontent.com',
+    
+    // MOVED HERE: No longer red because it's in the correct object
     redirectUri: AuthSession.makeRedirectUri({
       scheme: 'habitgarden',
     }),
@@ -41,28 +45,42 @@ export default function HomeScreen() {
   // 2. Handle the Google Auth Response
   useEffect(() => {
     if (response?.type === 'success') {
-      const { id_token } = response.params;
-      const credential = GoogleAuthProvider.credential(id_token);
-      signInWithCredential(auth, credential).catch((e) => console.log("Firebase Error", e));
+      // In native builds, the token is in authentication.idToken
+      const { idToken } = response.authentication || {};
+      
+      if (idToken) {
+        const credential = GoogleAuthProvider.credential(idToken);
+        signInWithCredential(auth, credential)
+          .catch((e) => console.error("Firebase Auth Error:", e));
+      }
     }
   }, [response]);
 
-  // 3. Listen for User state
+  // 3. Listen for User state and sync Firestore
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
       setLoading(false);
+      
       if (currentUser) {
-        const q = query(collection(db, "users", currentUser.uid, "habits"), orderBy("createdAt", "desc"));
-        return onSnapshot(q, (snapshot) => {
+        const q = query(
+          collection(db, "users", currentUser.uid, "habits"), 
+          orderBy("createdAt", "desc")
+        );
+        const unsubSnapshot = onSnapshot(q, (snapshot) => {
           setHabits(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
         });
+        return unsubSnapshot;
       }
     });
     return () => unsubscribe();
   }, []);
 
-  if (loading) return <View style={styles.centered}><ActivityIndicator size="large" color="#2ecc71" /></View>;
+  if (loading) return (
+    <View style={styles.centered}>
+      <ActivityIndicator size="large" color="#2ecc71" />
+    </View>
+  );
 
   if (!user) {
     return (
@@ -70,7 +88,7 @@ export default function HomeScreen() {
         <Text style={{fontSize: 70}}>🌻</Text>
         <Text style={styles.title}>Habit Garden</Text>
         <TouchableOpacity 
-          style={styles.loginBtn} 
+          style={[styles.loginBtn, !request && { opacity: 0.5 }]} 
           disabled={!request} 
           onPress={() => promptAsync()}
         >
@@ -98,10 +116,16 @@ export default function HomeScreen() {
         />
         <TouchableOpacity style={styles.addBtn} onPress={async () => {
           if (!habitName.trim()) return;
-          await addDoc(collection(db, "users", user.uid, "habits"), {
-            name: habitName, growthLevel: 0, createdAt: serverTimestamp()
-          });
-          setHabitName("");
+          try {
+            await addDoc(collection(db, "users", user.uid, "habits"), {
+              name: habitName, 
+              growthLevel: 0, 
+              createdAt: serverTimestamp()
+            });
+            setHabitName("");
+          } catch (err) {
+            console.error("Error adding habit:", err);
+          }
         }}>
           <Text style={{color: '#fff', fontWeight: 'bold'}}>Plant</Text>
         </TouchableOpacity>
@@ -110,10 +134,11 @@ export default function HomeScreen() {
       <FlatList 
         data={habits}
         numColumns={2}
+        keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
           <View style={styles.card}>
             <Text style={{fontSize: 40}}>🌱</Text>
-            <Text style={{fontWeight: 'bold', marginTop: 10}}>{item.name}</Text>
+            <Text style={{fontWeight: 'bold', marginTop: 10, textAlign: 'center'}}>{item.name}</Text>
           </View>
         )}
       />
@@ -124,12 +149,12 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fdfdfd' },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  header: { flexDirection: 'row', justifyContent: 'space-between', padding: 20, paddingTop: 50 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', padding: 20, paddingTop: Platform.OS === 'ios' ? 0 : 40 },
   title: { fontSize: 26, fontWeight: 'bold' },
   inputBox: { flexDirection: 'row', padding: 20 },
   input: { flex: 1, borderBottomWidth: 1, borderColor: '#eee', marginRight: 10, padding: 8 },
   addBtn: { backgroundColor: '#2ecc71', padding: 12, borderRadius: 10 },
-  card: { flex: 1, alignItems: 'center', padding: 20, margin: 10, backgroundColor: '#fff', borderRadius: 20, elevation: 3, shadowOpacity: 0.1 },
+  card: { flex: 1, alignItems: 'center', padding: 20, margin: 10, backgroundColor: '#fff', borderRadius: 20, elevation: 3, shadowOpacity: 0.1, shadowOffset: { width: 0, height: 2 }, shadowRadius: 5 },
   loginBtn: { backgroundColor: '#4285F4', padding: 15, borderRadius: 30, paddingHorizontal: 40, marginTop: 20 },
   loginText: { color: '#fff', fontWeight: 'bold', fontSize: 16 }
 });
